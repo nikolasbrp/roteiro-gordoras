@@ -1413,7 +1413,7 @@ function PaginaLugar({ lugar, onVoltar, isFavorito, onToggleFavorito, onIrParaRe
           )}
           {podeExcluirLugar(lugar) && (
             <button className="btn-icone perigo" aria-label="Excluir lugar"
-              onClick={() => setConfirmacao({ tipo: 'lugar' })}>🗑</button>
+              onClick={() => setConfirmacao({ tipo: 'lugar' })}>🗑️</button>
           )}
         </div>
 
@@ -1500,7 +1500,7 @@ function PaginaLugar({ lugar, onVoltar, isFavorito, onToggleFavorito, onIrParaRe
                     )}
                     {removivel && (
                       <button className="btn-acao-resenha perigo" aria-label="Excluir resenha"
-                        onClick={() => setConfirmacao({ tipo: 'resenha', alvo: av })}>🗑</button>
+                        onClick={() => setConfirmacao({ tipo: 'resenha', alvo: av })}>🗑️</button>
                     )}
                   </div>
                 </div>
