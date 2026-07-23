@@ -43,8 +43,8 @@ const COLECAO = 'restaurantes';
 // Os dois donos do app. Ambos podem excluir qualquer lugar e qualquer conteúdo
 // antigo. Esta lista precisa ser idêntica à das regras do Firestore.
 const DONOS = [
-  // 'uid-do-nikolas',
-  // 'uid-do-amigo'
+  'zdPKYx2sDpN02IuEsat17a0YdKf1',   // Níkolas
+  // 'COLE_AQUI_O_UID_DO_SEU_AMIGO'
 ];
 
 // true = ninguém vê nada sem estar logado (app privado).
