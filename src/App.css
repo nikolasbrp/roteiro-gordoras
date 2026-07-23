@@ -26,6 +26,7 @@
 }
 
 :root[data-theme="light"] {
+  color-scheme: light;
   --primary: #D94F04;
   --primary-suave: #FDEEE4;
   --secondary: #6B4423;
@@ -43,6 +44,7 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --primary: #FF8A3D;
   --primary-suave: #33241A;
   --secondary: #E8B98A;
@@ -980,7 +982,26 @@ h1, h2, h3 { font-family: var(--fonte-display); line-height: 1.2; }
 .nome-input:focus { outline: none; border-color: var(--primary); }
 
 .textarea-resenha { min-height: 130px; resize: vertical; line-height: 1.6; }
-.textarea-observacao { min-height: 60px; resize: vertical; font-size: 0.9rem; }
+
+.textarea-observacao {
+  display: block;
+  width: 100%;
+  min-height: 62px;
+  margin-top: var(--esp-2);
+  padding: 0.65rem 0.8rem;
+  font-family: var(--fonte-corpo);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--texto);
+  background: var(--bg);
+  border: 1.5px solid var(--borda);
+  border-radius: var(--raio-sm);
+  resize: vertical;
+  transition: border-color var(--transicao);
+}
+
+.textarea-observacao::placeholder { color: var(--texto-suave); opacity: 0.75; }
+.textarea-observacao:focus { outline: none; border-color: var(--primary); }
 
 .contador {
   display: block;
@@ -1345,7 +1366,7 @@ h1, h2, h3 { font-family: var(--fonte-display); line-height: 1.2; }
 
 .btn-icone.perigo { color: var(--perigo); border-color: var(--perigo); }
 
-.btn-margem { margin: 0 var(--esp-4) var(--esp-4); width: calc(100% - var(--esp-4) * 2); }
+.btn-margem { margin: var(--esp-5) var(--esp-4) var(--esp-4); width: calc(100% - var(--esp-4) * 2); }
 
 /* ===== MODAL DE CONFIRMAÇÃO ===== */
 .modal-fundo {
@@ -1457,7 +1478,15 @@ h1, h2, h3 { font-family: var(--fonte-display); line-height: 1.2; }
   font-weight: 800;
 }
 
-.perfil-dados { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.perfil-dados {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.perfil-dados .link-btn { text-align: left; margin-top: var(--esp-1); }
 
 .perfil-dados strong {
   font-size: 1.05rem;
@@ -1821,3 +1850,24 @@ button.conta-numero:hover { border-color: var(--primary); }
   background: var(--primary-suave);
   box-shadow: 0 0 0 3px rgba(198, 54, 43, 0.2), 0 3px 7px rgba(0, 0, 0, 0.35);
 }
+
+/* Contador discreto ao lado do título de uma seção */
+.secao-contagem {
+  font-family: var(--fonte-corpo);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--raio-pill);
+  background: var(--bg-sutil);
+  color: var(--texto-suave);
+}
+
+/* ===== DATA DA VISITA ===== */
+.input-data {
+  max-width: 220px;
+  cursor: pointer;
+}
+
+.hint-data { margin-top: var(--esp-2); margin-bottom: 0; }
+
+.av-data-secundaria { opacity: 0.7; }

@@ -276,6 +276,21 @@ const lerLocal = (chave, padrao) => {
   }
 };
 
+// Data de hoje no formato do <input type="date">, respeitando o fuso local.
+// Usar toISOString() direto devolveria o dia errado à noite no Brasil (UTC-3).
+const hojeISO = () => {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+};
+
+// Converte "2026-07-20" em "20/07/2026" sem passar por new Date(), que
+// interpretaria a string como meia-noite UTC e voltaria um dia no calendário.
+const formatarDataISO = (iso) => {
+  if (!iso || typeof iso !== 'string') return null;
+  const [ano, mes, dia] = iso.split('-');
+  return ano && mes && dia ? `${dia}/${mes}/${ano}` : null;
+};
+
 // ============ TOASTS ============
 const ToastCtx = createContext(() => {});
 const useToast = () => useContext(ToastCtx);
@@ -656,13 +671,13 @@ function PaginaConta({ lugares, favoritos, onVoltar, onNavigate, onSelect }) {
                 {usuario.displayName || 'Sem nome'}
                 {ehDono && <span className="selo-admin">dono</span>}
               </strong>
+              <span className="perfil-email">{usuario.email}</span>
               <button className="link-btn"
                 onClick={() => { setNovoNome(usuario.displayName || ''); setEditandoNome(true); }}>
                 Editar nome
               </button>
             </>
           )}
-          <span className="perfil-email">{usuario.email}</span>
         </div>
       </div>
 
@@ -780,6 +795,13 @@ function HomePage({ lugares, carregando, favoritos, darkMode, onToggleDarkMode, 
     })
     .slice(0, 4), [comAvaliacoes]);
 
+  // Lugares cadastrados que ninguém avaliou ainda. Antes eles sumiam da tela
+  // inicial, o que fazia o contador dizer "1 lugar" ao lado de "nenhum lugar".
+  const semAvaliacao = useMemo(
+    () => lugares.filter(l => !(l.avaliacoes || []).length),
+    [lugares]
+  );
+
   return (
     <div className="home-page">
       <header className="header">
@@ -829,7 +851,11 @@ function HomePage({ lugares, carregando, favoritos, darkMode, onToggleDarkMode, 
         </div>
       )}
 
-      {carregando ? <Esqueleto linhas={2} /> : destaque ? (
+      {carregando ? <Esqueleto linhas={2} /> : lugares.length === 0 ? (
+        <Vazio icone="📍" titulo="Nenhum lugar ainda"
+          texto="Cadastre o primeiro ponto do roteiro."
+          acao={<button className="btn-primary" onClick={() => onNavigate('novo')}>Cadastrar lugar</button>} />
+      ) : destaque ? (
         <section className="secao">
           <div className="secao-titulo">
             <h2>Melhor avaliado</h2>
@@ -847,17 +873,29 @@ function HomePage({ lugares, carregando, favoritos, darkMode, onToggleDarkMode, 
             </div>
           </div>
         </section>
-      ) : (
-        <Vazio icone="📍" titulo="Nenhum lugar ainda"
-          texto="Cadastre o primeiro ponto do roteiro."
-          acao={<button className="btn-primary" onClick={() => onNavigate('novo')}>Cadastrar lugar</button>} />
-      )}
+      ) : null}
 
       {recentes.length > 0 && (
         <section className="secao">
           <div className="secao-titulo"><h2>Avaliados recentemente</h2></div>
           <div className="lista-cards">
             {recentes.map(l => (
+              <CardLugar key={l.id} lugar={l} onSelect={onSelect} favorito={favoritos.includes(l.id)}
+                distancia={posicaoUsuario && l.latitude
+                  ? distanciaKm(posicaoUsuario[0], posicaoUsuario[1], l.latitude, l.longitude) : null} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {semAvaliacao.length > 0 && (
+        <section className="secao">
+          <div className="secao-titulo">
+            <h2>Esperando a primeira resenha</h2>
+            <span className="secao-contagem">{semAvaliacao.length}</span>
+          </div>
+          <div className="lista-cards">
+            {semAvaliacao.map(l => (
               <CardLugar key={l.id} lugar={l} onSelect={onSelect} favorito={favoritos.includes(l.id)}
                 distancia={posicaoUsuario && l.latitude
                   ? distanciaKm(posicaoUsuario[0], posicaoUsuario[1], l.latitude, l.longitude) : null} />
@@ -1283,6 +1321,12 @@ function PaginaLugar({ lugar, onVoltar, isFavorito, onToggleFavorito, onIrParaRe
   const avaliacoes = [...(lugar.avaliacoes || [])].reverse();
   const tipo = infoTipo(lugar);
 
+  // Datas ISO ordenam corretamente como texto, então basta pegar a maior.
+  const ultimaVisita = useMemo(() => {
+    const datas = (lugar.avaliacoes || []).map(a => a.dataVisita).filter(Boolean).sort();
+    return datas.length ? formatarDataISO(datas[datas.length - 1]) : null;
+  }, [lugar.avaliacoes]);
+
   const compartilhar = async () => {
     const texto = `${lugar.nome} — ⭐ ${media.toFixed(1)} no Roteiro Górdoras`;
     try {
@@ -1373,9 +1417,11 @@ function PaginaLugar({ lugar, onVoltar, isFavorito, onToggleFavorito, onIrParaRe
           {(lugar.tags || []).map(tag => <span key={tag} className="tag">{tag}</span>)}
         </div>
 
-        {lugar.criadoPorNome && (
-          <p className="lugar-autoria">Cadastrado por {lugar.criadoPorNome}</p>
-        )}
+        <p className="lugar-autoria">
+          {ultimaVisita && <>Última visita em {ultimaVisita}</>}
+          {ultimaVisita && lugar.criadoPorNome && ' · '}
+          {lugar.criadoPorNome && <>Cadastrado por {lugar.criadoPorNome}</>}
+        </p>
       </div>
 
       {categorias.length > 0 && (
@@ -1413,6 +1459,8 @@ function PaginaLugar({ lugar, onVoltar, isFavorito, onToggleFavorito, onIrParaRe
           avaliacoes.map((av, idx) => {
             const minha = !!usuario && av.uid === usuario.uid;
             const removivel = podeExcluirResenha(av);
+            const visita = formatarDataISO(av.dataVisita);
+            const mostrarEscrita = visita && av.data && visita !== av.data;
             return (
               <article key={av.id || idx} className={`avaliacao-card ${minha ? 'minha' : ''}`}>
                 <div className="av-header">
@@ -1421,7 +1469,12 @@ function PaginaLugar({ lugar, onVoltar, isFavorito, onToggleFavorito, onIrParaRe
                   </span>
                   <div className="av-identidade">
                     <strong>{av.avaliadorNome}{minha && <span className="selo-voce">você</span>}</strong>
-                    <span className="av-data">{av.data}</span>
+                    <span className="av-data">
+                      {visita ? `Visitou em ${visita}` : av.data}
+                      {mostrarEscrita && (
+                        <span className="av-data-secundaria"> · escrita em {av.data}</span>
+                      )}
+                    </span>
                   </div>
                   {removivel && (
                     <button className="btn-excluir-resenha" aria-label="Excluir resenha"
@@ -1494,6 +1547,7 @@ function FormularioResenha({ lugar, onSave, onCancel }) {
   const [categoriaCustom, setCategoriaCustom] = useState('');
   const [iconCustom, setIconCustom] = useState('⭐');
   const [resenhageral, setResenhageral] = useState('');
+  const [dataVisita, setDataVisita] = useState(hojeISO);
   const [salvando, setSalvando] = useState(false);
 
   const jaAvaliei = (lugar.avaliacoes || []).some(av => av.uid === usuario?.uid);
@@ -1518,6 +1572,8 @@ function FormularioResenha({ lugar, onSave, onCancel }) {
     if (!usuario) return toast('Entre na sua conta para publicar', 'erro');
     if (categorias.length === 0) return toast('Adicione pelo menos uma categoria', 'erro');
     if (!resenhageral.trim()) return toast('Escreva a resenha geral', 'erro');
+    if (!dataVisita) return toast('Informe a data da visita', 'erro');
+    if (dataVisita > hojeISO()) return toast('A visita não pode ser no futuro', 'erro');
 
     setSalvando(true);
     try {
@@ -1526,7 +1582,8 @@ function FormularioResenha({ lugar, onSave, onCancel }) {
         avaliadorNome: usuario.displayName || usuario.email,
         categorias,
         resenhageral: resenhageral.trim(),
-        data: new Date().toLocaleDateString('pt-BR'),
+        dataVisita,                                    // quando esteve no lugar
+        data: new Date().toLocaleDateString('pt-BR'),  // quando escreveu
         id: `${usuario.uid}-${Date.now()}`
       };
 
@@ -1590,6 +1647,21 @@ function FormularioResenha({ lugar, onSave, onCancel }) {
             <button className="btn-secondary" onClick={adicionarCategoriaCustom}>Adicionar</button>
           </div>
         </div>
+      </div>
+
+      <div className="form-group">
+        <label htmlFor="data-visita">Quando você foi?</label>
+        <input
+          id="data-visita"
+          type="date"
+          className="input-data"
+          value={dataVisita}
+          max={hojeISO()}
+          onChange={e => setDataVisita(e.target.value)}
+        />
+        <p className="hint hint-data">
+          Vem preenchido com hoje. Ajuste se a visita foi em outro dia.
+        </p>
       </div>
 
       <div className="form-group">
