@@ -1907,7 +1907,9 @@ function AppInterno() {
   const toast = useToast();
   const { usuario, carregandoAuth } = useAuth();
   const [page, setPage] = useState('home');
-  const [pilha, setPilha] = useState([]);
+  // A pilha de navegação nunca é exibida, então vive num ref: guardá-la em
+  // estado causava um render extra a cada troca de tela sem nenhum ganho.
+  const pilhaRef = useRef([]);
   const [lugares, setLugares] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [idSelecionado, setIdSelecionado] = useState(null);
@@ -1975,21 +1977,19 @@ function AppInterno() {
   }), [toast]);
 
   const navegar = useCallback((destino) => {
-    setPilha(p => [...p, page]);
+    pilhaRef.current = [...pilhaRef.current, page];
     setPage(destino);
     window.scrollTo({ top: 0 });
   }, [page]);
 
   const voltar = useCallback(() => {
-    setPilha(p => {
-      setPage(p[p.length - 1] || 'home');
-      return p.slice(0, -1);
-    });
+    const anterior = pilhaRef.current.pop() || 'home';
+    setPage(anterior);
     window.scrollTo({ top: 0 });
   }, []);
 
   const irParaNav = (destino) => {
-    setPilha([]);
+    pilhaRef.current = [];
     setPage(destino);
     window.scrollTo({ top: 0 });
   };
