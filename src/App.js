@@ -22,12 +22,12 @@ import './App.css';
 
 // ============ FIREBASE ============
 const firebaseConfig = {
-  apiKey: "AIzaSyALS9cqMucbXgdzDoIPpv62bCGCUXMMTQs",
+  apiKey: "AIzaSyAlS9cqMucbXgdzDoIPpv62bC6CUXMMTQs",
   authDomain: "roteiro-gordoras.firebaseapp.com",
   projectId: "roteiro-gordoras",
   storageBucket: "roteiro-gordoras.firebasestorage.app",
   messagingSenderId: "197667618881",
-  appId: "1:197667618881:web:c3d565301884f3645af46c9"
+  appId: "1:197667618881:web:c3d56530184f3645af46c0"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -178,12 +178,22 @@ const ERROS_AUTH = {
   'auth/invalid-credential': 'E-mail ou senha incorretos.',
   'auth/email-already-in-use': 'Já existe uma conta com esse e-mail.',
   'auth/weak-password': 'A senha precisa de pelo menos 6 caracteres.',
+  'auth/missing-password': 'Digite uma senha.',
   'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos.',
-  'auth/unauthorized-domain': 'Este domínio não está autorizado no Firebase.',
+  'auth/unauthorized-domain': 'Domínio não autorizado no Firebase (Authentication > Settings > Authorized domains).',
+  'auth/operation-not-allowed': 'Login por e-mail e senha não está ativado (Authentication > Sign-in method).',
+  'auth/admin-restricted-operation': 'Criação de contas está bloqueada nas configurações do Firebase.',
+  'auth/configuration-not-found': 'O Authentication ainda não foi iniciado neste projeto Firebase.',
+  'auth/invalid-api-key': 'A apiKey do firebaseConfig está incorreta.',
   'auth/network-request-failed': 'Sem conexão com o servidor.'
 };
 
-const traduzirErroAuth = (e) => ERROS_AUTH[e?.code] || 'Não foi possível concluir. Tente de novo.';
+// Mostra a mensagem em português e deixa o código original no console do
+// navegador, para dar o que investigar quando a tradução não cobrir o caso.
+const traduzirErroAuth = (e) => {
+  console.error('[auth]', e?.code, e?.message);
+  return ERROS_AUTH[e?.code] || `Não foi possível concluir (${e?.code || 'erro desconhecido'}).`;
+};
 
 // ============ LEAFLET ============
 delete L.Icon.Default.prototype._getIconUrl;
