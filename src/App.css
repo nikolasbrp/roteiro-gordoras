@@ -1018,7 +1018,7 @@ h1, h2, h3 { font-family: var(--fonte-display); line-height: 1.2; }
 }
 
 .subtitle-form {
-  padding: 0 var(--esp-4);
+  padding: var(--esp-4) var(--esp-4) 0;
   color: var(--texto-suave);
   font-size: 0.9rem;
 }
@@ -1030,7 +1030,7 @@ h1, h2, h3 { font-family: var(--fonte-display); line-height: 1.2; }
   padding: var(--esp-4);
 }
 
-.secao-categorias { padding: var(--esp-4) var(--esp-4) 0; }
+.secao-categorias { padding: var(--esp-5) var(--esp-4) 0; }
 
 .categoria-avaliacao {
   background: var(--bg-elevado);
@@ -1646,8 +1646,13 @@ button.conta-numero:hover { border-color: var(--primary); }
 
 .avaliacao-card.minha { border-color: var(--primary); }
 
-.btn-excluir-resenha {
+.av-acoes {
   flex-shrink: 0;
+  display: flex;
+  gap: var(--esp-2);
+}
+
+.btn-acao-resenha {
   background: none;
   border: 1px solid var(--borda);
   color: var(--texto-suave);
@@ -1655,14 +1660,20 @@ button.conta-numero:hover { border-color: var(--primary); }
   height: 34px;
   border-radius: var(--raio-pill);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  display: grid;
+  place-items: center;
   transition: all var(--transicao);
 }
 
-.btn-excluir-resenha:hover {
+.btn-acao-resenha:hover {
+  border-color: var(--primary);
+  background: var(--bg-sutil);
+}
+
+.btn-acao-resenha.perigo:hover {
   color: var(--perigo);
   border-color: var(--perigo);
-  background: var(--bg-sutil);
 }
 
 .aviso-legado {

@@ -351,8 +351,15 @@ function AuthProvider({ children }) {
     return ehDono;
   }, [usuario, ehDono]);
 
+  // Editar segue exatamente a mesma regra de excluir: quem manda no lugar
+  // manda no cadastro dele, e a resenha é de quem escreveu.
   const valor = useMemo(
-    () => ({ usuario, carregandoAuth, ehDono, podeExcluirLugar, podeExcluirResenha }),
+    () => ({
+      usuario, carregandoAuth, ehDono,
+      podeExcluirLugar, podeExcluirResenha,
+      podeEditarLugar: podeExcluirLugar,
+      podeEditarResenha: podeExcluirResenha
+    }),
     [usuario, carregandoAuth, ehDono, podeExcluirLugar, podeExcluirResenha]
   );
 
@@ -1310,9 +1317,11 @@ function PaginaEstatisticas({ lugares, favoritos, onVoltar }) {
 }
 
 // ============ PÁGINA DO LUGAR ============
-function PaginaLugar({ lugar, onVoltar, isFavorito, onToggleFavorito, onIrParaResenha, onExcluido }) {
+function PaginaLugar({ lugar, onVoltar, isFavorito, onToggleFavorito, onIrParaResenha,
+                      onEditarLugar, onEditarResenha, onExcluido }) {
   const toast = useToast();
-  const { usuario, podeExcluirLugar, podeExcluirResenha } = useAuth();
+  const { usuario, podeExcluirLugar, podeExcluirResenha,
+          podeEditarLugar, podeEditarResenha } = useAuth();
   const [confirmacao, setConfirmacao] = useState(null);
   const [ocupado, setOcupado] = useState(false);
 
@@ -1398,6 +1407,10 @@ function PaginaLugar({ lugar, onVoltar, isFavorito, onToggleFavorito, onIrParaRe
             aria-label={isFavorito ? 'Remover dos salvos' : 'Salvar'}>
             {isFavorito ? '❤️' : '🤍'}
           </button>
+          {podeEditarLugar(lugar) && (
+            <button className="btn-icone" aria-label="Editar cadastro"
+              onClick={() => onEditarLugar(lugar)}>✏️</button>
+          )}
           {podeExcluirLugar(lugar) && (
             <button className="btn-icone perigo" aria-label="Excluir lugar"
               onClick={() => setConfirmacao({ tipo: 'lugar' })}>🗑</button>
@@ -1459,6 +1472,7 @@ function PaginaLugar({ lugar, onVoltar, isFavorito, onToggleFavorito, onIrParaRe
           avaliacoes.map((av, idx) => {
             const minha = !!usuario && av.uid === usuario.uid;
             const removivel = podeExcluirResenha(av);
+            const editavel = podeEditarResenha(av);
             const visita = formatarDataISO(av.dataVisita);
             const mostrarEscrita = visita && av.data && visita !== av.data;
             return (
@@ -1474,12 +1488,21 @@ function PaginaLugar({ lugar, onVoltar, isFavorito, onToggleFavorito, onIrParaRe
                       {mostrarEscrita && (
                         <span className="av-data-secundaria"> · escrita em {av.data}</span>
                       )}
+                      {av.editadaEm && (
+                        <span className="av-data-secundaria"> · editada em {av.editadaEm}</span>
+                      )}
                     </span>
                   </div>
-                  {removivel && (
-                    <button className="btn-excluir-resenha" aria-label="Excluir resenha"
-                      onClick={() => setConfirmacao({ tipo: 'resenha', alvo: av })}>🗑</button>
-                  )}
+                  <div className="av-acoes">
+                    {editavel && (
+                      <button className="btn-acao-resenha" aria-label="Editar resenha"
+                        onClick={() => onEditarResenha(av)}>✏️</button>
+                    )}
+                    {removivel && (
+                      <button className="btn-acao-resenha perigo" aria-label="Excluir resenha"
+                        onClick={() => setConfirmacao({ tipo: 'resenha', alvo: av })}>🗑</button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="categorias-resumo">
@@ -1535,22 +1558,25 @@ function PaginaLugar({ lugar, onVoltar, isFavorito, onToggleFavorito, onIrParaRe
 }
 
 // ============ FORMULÁRIO DE RESENHA ============
-function FormularioResenha({ lugar, onSave, onCancel }) {
+function FormularioResenha({ lugar, avaliacaoExistente, onSave, onCancel }) {
   const toast = useToast();
-  const { usuario } = useAuth();
+  const { usuario, podeEditarResenha } = useAuth();
+  const editando = !!avaliacaoExistente;
 
   // Categorias já usadas neste lugar, ou o conjunto padrão do tipo dele.
   const [categorias, setCategorias] = useState(() =>
-    (lugar.categorias?.length ? lugar.categorias : infoTipo(lugar).categorias)
-      .map(c => ({ name: c.name, icon: c.icon, estrelas: 3, observacao: '' }))
+    editando
+      ? (avaliacaoExistente.categorias || []).map(c => ({ ...c }))
+      : (lugar.categorias?.length ? lugar.categorias : infoTipo(lugar).categorias)
+          .map(c => ({ name: c.name, icon: c.icon, estrelas: 3, observacao: '' }))
   );
   const [categoriaCustom, setCategoriaCustom] = useState('');
   const [iconCustom, setIconCustom] = useState('⭐');
-  const [resenhageral, setResenhageral] = useState('');
-  const [dataVisita, setDataVisita] = useState(hojeISO);
+  const [resenhageral, setResenhageral] = useState(avaliacaoExistente?.resenhageral || '');
+  const [dataVisita, setDataVisita] = useState(() => avaliacaoExistente?.dataVisita || hojeISO());
   const [salvando, setSalvando] = useState(false);
 
-  const jaAvaliei = (lugar.avaliacoes || []).some(av => av.uid === usuario?.uid);
+  const jaAvaliei = !editando && (lugar.avaliacoes || []).some(av => av.uid === usuario?.uid);
 
   const adicionarCategoriaCustom = () => {
     const nome = categoriaCustom.trim();
@@ -1577,6 +1603,32 @@ function FormularioResenha({ lugar, onSave, onCancel }) {
 
     setSalvando(true);
     try {
+      // Edição: troca o item da lista pelo id, dentro de uma transação, para
+      // não desfazer uma resenha que a outra pessoa publicou nesse intervalo.
+      if (editando) {
+        await runTransaction(db, async (tx) => {
+          const ref = doc(db, COLECAO, lugar.id);
+          const snap = await tx.get(ref);
+          if (!snap.exists()) throw new Error('inexistente');
+          const atuais = snap.data().avaliacoes || [];
+          const idx = atuais.findIndex(a => a.id === avaliacaoExistente.id);
+          if (idx === -1) throw new Error('inexistente');
+          if (!podeEditarResenha(atuais[idx])) throw new Error('permissao');
+          const copia = [...atuais];
+          copia[idx] = {
+            ...atuais[idx],
+            categorias,
+            resenhageral: resenhageral.trim(),
+            dataVisita,
+            editadaEm: new Date().toLocaleDateString('pt-BR')
+          };
+          tx.update(ref, { avaliacoes: copia, atualizadoEm: serverTimestamp() });
+        });
+        toast('Resenha atualizada', 'ok');
+        onSave();
+        return;
+      }
+
       const novaAvaliacao = {
         uid: usuario.uid,
         avaliadorNome: usuario.displayName || usuario.email,
@@ -1603,7 +1655,9 @@ function FormularioResenha({ lugar, onSave, onCancel }) {
       onSave();
     } catch (e) {
       console.error(e);
-      toast('Não foi possível salvar. Verifique a conexão.', 'erro');
+      toast(e.message === 'permissao'
+        ? 'Só quem escreveu pode editar a resenha'
+        : 'Não foi possível salvar. Verifique a conexão.', 'erro');
     } finally {
       setSalvando(false);
     }
@@ -1611,10 +1665,10 @@ function FormularioResenha({ lugar, onSave, onCancel }) {
 
   return (
     <div className="form-container">
-      <Cabecalho titulo={`Avaliando ${lugar.nome}`} onVoltar={onCancel} />
+      <Cabecalho titulo={editando ? 'Editar resenha' : `Avaliando ${lugar.nome}`} onVoltar={onCancel} />
 
       <p className="subtitle-form">
-        {infoTipo(lugar).icone} {infoTipo(lugar).label} · assinando como{' '}
+        {infoTipo(lugar).icone} {editando ? lugar.nome : infoTipo(lugar).label} · assinando como{' '}
         <strong>{usuario?.displayName || usuario?.email}</strong>.
         {jaAvaliei && ' Você já avaliou este lugar — esta será uma segunda resenha.'}
       </p>
@@ -1673,7 +1727,7 @@ function FormularioResenha({ lugar, onSave, onCancel }) {
 
       <div className="form-buttons">
         <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
-          {salvando ? 'Publicando…' : 'Publicar resenha'}
+          {salvando ? 'Salvando…' : editando ? 'Salvar alterações' : 'Publicar resenha'}
         </button>
         <button className="btn-secondary" onClick={onCancel}>Cancelar</button>
       </div>
@@ -1696,16 +1750,18 @@ function SeletorPonto({ posicao, onChange }) {
   ) : null;
 }
 
-// ============ NOVO LUGAR ============
-function FormularioNovoLugar({ nomePreliminar, onSave, onCancel, posicaoUsuario, onLocalizar }) {
+// ============ CADASTRO DE LUGAR (novo ou edição) ============
+function FormularioLugar({ lugarExistente, nomePreliminar, onSave, onCancel, posicaoUsuario, onLocalizar }) {
   const toast = useToast();
   const { usuario } = useAuth();
-  const [nome, setNome] = useState(nomePreliminar || '');
-  const [tipo, setTipo] = useState('restaurante');
-  const [tagsEscolhidas, setTagsEscolhidas] = useState([]);
+  const editando = !!lugarExistente;
+  const [nome, setNome] = useState(lugarExistente?.nome || nomePreliminar || '');
+  const [tipo, setTipo] = useState(() => (editando ? tipoDe(lugarExistente) : 'restaurante'));
+  const [tagsEscolhidas, setTagsEscolhidas] = useState(lugarExistente?.tags || []);
   const [tagCustom, setTagCustom] = useState('');
-  const [posicao, setPosicao] = useState(null);
-  const [enderecoBusca, setEnderecoBusca] = useState('');
+  const [posicao, setPosicao] = useState(() =>
+    lugarExistente?.latitude ? [lugarExistente.latitude, lugarExistente.longitude] : null);
+  const [enderecoBusca, setEnderecoBusca] = useState(lugarExistente?.endereco || '');
   const [sugestoes, setSugestoes] = useState([]);
   const [buscandoEndereco, setBuscandoEndereco] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -1772,6 +1828,23 @@ function FormularioNovoLugar({ nomePreliminar, onSave, onCancel, posicaoUsuario,
 
     setSalvando(true);
     try {
+      if (editando) {
+        // As categorias de avaliação não são tocadas: as resenhas já
+        // existentes dependem delas, mesmo que o tipo mude.
+        await updateDoc(doc(db, COLECAO, lugarExistente.id), {
+          nome: nome.trim(),
+          tipo,
+          tags: tagsEscolhidas,
+          latitude: posicao[0],
+          longitude: posicao[1],
+          endereco: enderecoBusca.trim() || null,
+          atualizadoEm: serverTimestamp()
+        });
+        toast('Cadastro atualizado', 'ok');
+        onSave();
+        return;
+      }
+
       await addDoc(collection(db, COLECAO), {
         nome: nome.trim(),
         tipo,
@@ -1790,7 +1863,9 @@ function FormularioNovoLugar({ nomePreliminar, onSave, onCancel, posicaoUsuario,
       onSave();
     } catch (e) {
       console.error(e);
-      toast('Não foi possível salvar o lugar', 'erro');
+      toast(editando
+        ? 'Sem permissão para editar este cadastro'
+        : 'Não foi possível salvar o lugar', 'erro');
     } finally {
       setSalvando(false);
     }
@@ -1801,7 +1876,7 @@ function FormularioNovoLugar({ nomePreliminar, onSave, onCancel, posicaoUsuario,
 
   return (
     <div className="form-container">
-      <Cabecalho titulo="Novo lugar" onVoltar={onCancel} />
+      <Cabecalho titulo={editando ? 'Editar cadastro' : 'Novo lugar'} onVoltar={onCancel} />
 
       <div className="form-group">
         <label>Que tipo de lugar é?</label>
@@ -1815,8 +1890,9 @@ function FormularioNovoLugar({ nomePreliminar, onSave, onCancel, posicaoUsuario,
           ))}
         </div>
         <p className="hint">
-          As categorias de avaliação mudam conforme o tipo — um hotel recebe nota de
-          quarto e café da manhã, um parque recebe de paisagem e estrutura.
+          {editando && (lugarExistente.avaliacoes || []).length > 0
+            ? 'Trocar o tipo não mexe nas categorias das resenhas já publicadas — elas continuam como estão.'
+            : 'As categorias de avaliação mudam conforme o tipo — um hotel recebe nota de quarto e café da manhã, um parque recebe de paisagem e estrutura.'}
         </p>
       </div>
 
@@ -1887,7 +1963,7 @@ function FormularioNovoLugar({ nomePreliminar, onSave, onCancel, posicaoUsuario,
 
       <div className="form-buttons">
         <button className="btn-primary" onClick={handleSave} disabled={salvando}>
-          {salvando ? 'Salvando…' : 'Cadastrar lugar'}
+          {salvando ? 'Salvando…' : editando ? 'Salvar alterações' : 'Cadastrar lugar'}
         </button>
         <button className="btn-secondary" onClick={onCancel}>Cancelar</button>
       </div>
@@ -1996,6 +2072,7 @@ function AppInterno() {
   const [carregando, setCarregando] = useState(true);
   const [idSelecionado, setIdSelecionado] = useState(null);
   const [nomePreliminar, setNomePreliminar] = useState('');
+  const [resenhaEmEdicao, setResenhaEmEdicao] = useState(null);
   const [motivoLogin, setMotivoLogin] = useState('');
   const [posicaoUsuario, setPosicaoUsuario] = useState(null);
   const [online, setOnline] = useState(navigator.onLine);
@@ -2089,6 +2166,13 @@ function AppInterno() {
     exigirLogin('novo', 'Entre para cadastrar um lugar novo.');
   };
 
+  const editarLugar = () => navegar('editarLugar');
+
+  const editarResenha = (avaliacao) => {
+    setResenhaEmEdicao(avaliacao);
+    navegar('editarResenha');
+  };
+
   const toggleFavorito = (id) =>
     setFavoritos(prev => prev.includes(id) ? prev.filter(f => f !== id) : [id, ...prev]);
 
@@ -2154,6 +2238,8 @@ function AppInterno() {
             isFavorito={favoritos.includes(selecionado.id)}
             onToggleFavorito={() => toggleFavorito(selecionado.id)}
             onIrParaResenha={() => exigirLogin('resenha', 'Entre para publicar sua resenha.')}
+            onEditarLugar={editarLugar}
+            onEditarResenha={editarResenha}
             onExcluido={() => { setIdSelecionado(null); irParaNav('home'); }} />
         )}
 
@@ -2161,8 +2247,18 @@ function AppInterno() {
           <FormularioResenha lugar={selecionado} onSave={voltar} onCancel={voltar} />
         )}
 
+        {page === 'editarResenha' && selecionado && resenhaEmEdicao && (
+          <FormularioResenha lugar={selecionado} avaliacaoExistente={resenhaEmEdicao}
+            onSave={voltar} onCancel={voltar} />
+        )}
+
         {page === 'novo' && (
-          <FormularioNovoLugar nomePreliminar={nomePreliminar} onSave={voltar} onCancel={voltar}
+          <FormularioLugar nomePreliminar={nomePreliminar} onSave={voltar} onCancel={voltar}
+            posicaoUsuario={posicaoUsuario} onLocalizar={localizar} />
+        )}
+
+        {page === 'editarLugar' && selecionado && (
+          <FormularioLugar lugarExistente={selecionado} onSave={voltar} onCancel={voltar}
             posicaoUsuario={posicaoUsuario} onLocalizar={localizar} />
         )}
 
